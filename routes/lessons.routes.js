@@ -70,4 +70,50 @@ router.patch("/:id/like", verifyToken, async (req, res) => {
   }
 });
 
+// Get all lessons for the logged-in user
+router.get("/me/all", verifyToken, async (req, res) => {
+  try {
+    const lessons = await Lesson.find({ creatorId: req.user.id }).sort({ createdAt: -1 });
+    res.json({ success: true, lessons });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Update a lesson
+router.patch("/:id", verifyToken, async (req, res) => {
+  try {
+    const lesson = await Lesson.findById(req.params.id);
+    if (!lesson) return res.status(404).json({ success: false, message: "Lesson not found." });
+
+    // Verify ownership or admin role
+    if (lesson.creatorId.toString() !== req.user.id && req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Unauthorized to edit this lesson." });
+    }
+
+    const updatedLesson = await Lesson.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json({ success: true, lesson: updatedLesson });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Delete a lesson
+router.delete("/:id", verifyToken, async (req, res) => {
+  try {
+    const lesson = await Lesson.findById(req.params.id);
+    if (!lesson) return res.status(404).json({ success: false, message: "Lesson not found." });
+
+    // Verify ownership or admin role
+    if (lesson.creatorId.toString() !== req.user.id && req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Unauthorized to delete this lesson." });
+    }
+
+    await Lesson.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: "Lesson deleted successfully." });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 export default router;
