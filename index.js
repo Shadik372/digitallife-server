@@ -2,6 +2,10 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { connectDB } from "./config/db.js";
+import { toNodeHandler } from "better-auth/node";
+import { auth } from "./lib/auth.js";
+import favoriteRoutes from "./routes/favorites.routes.js";
+import commentRoutes from "./routes/comments.routes.js";
 
 dotenv.config();
 
@@ -14,8 +18,12 @@ app.use(cors({
   credentials: true
 }));
 
-// Stripe webhook must use raw body parsing, so we will add it here later BEFORE express.json()
+// Mount Better Auth BEFORE express.json()
+app.all("/api/auth/*", toNodeHandler(auth));
 
+// Stripe webhook will go here later BEFORE express.json()
+
+// Global JSON Parser
 app.use(express.json());
 
 // Basic Health Check Route
@@ -25,10 +33,17 @@ app.get("/", (req, res) => {
 
 // Initialize Server
 const startServer = async () => {
-  await connectDB();
+  await connectDB(); // Mongoose connects here
+  
+  // (Your future CRUD API routes will go here)
+
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
+
+  app.use("/api/favorites", favoriteRoutes);
+  app.use("/api/comments", commentRoutes);
+
 };
 
 startServer();
