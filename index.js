@@ -6,6 +6,7 @@ import { toNodeHandler } from "better-auth/node";
 import { auth } from "./lib/auth.js";
 
 // Import all routes
+import adminRoutes from "./routes/admin.routes.js"; 
 import userRoutes from "./routes/users.routes.js";
 import lessonRoutes from "./routes/lessons.routes.js";
 import favoriteRoutes from "./routes/favorites.routes.js";
@@ -41,6 +42,7 @@ const startServer = async () => {
   app.use(express.json());
 
   // 3. Mount standard CRUD routes
+  app.use("/api/admin", adminRoutes);
   app.use("/api/users", userRoutes);
   app.use("/api/lessons", lessonRoutes);
   app.use("/api/favorites", favoriteRoutes);
