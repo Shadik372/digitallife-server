@@ -3,6 +3,7 @@ import User from "../models/User.js";
 import Lesson from "../models/Lesson.js";
 import Purchase from "../models/Purchase.js";
 import { verifyToken } from "../middlewares/verifyToken.js";
+import SellerApplication from "../models/SellerApplication.js";
 
 const router = express.Router();
 
@@ -114,6 +115,63 @@ router.delete("/lessons/:id", async (req, res) => {
       return res.status(404).json({ success: false, message: "Lesson not found." });
     }
     res.json({ success: true, message: "Lesson deleted by admin." });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==========================================
+// 📝 4. SELLER APPLICATIONS
+// ==========================================
+
+// Get all pending applications
+router.get("/applications", async (req, res) => {
+  try {
+    // Fetch from the new schema, and populate the user details for the frontend table
+    const applications = await SellerApplication.find({ status: "pending" })
+      .populate("userId", "name email photoURL") 
+      .sort({ createdAt: -1 });
+      
+    res.json({ success: true, applications });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Approve or Reject an application
+router.patch("/applications/:id/:action", async (req, res) => {
+  try {
+    const { id, action } = req.params;
+    
+    const application = await SellerApplication.findById(id);
+    if (!application) {
+      return res.status(404).json({ success: false, message: "Application not found." });
+    }
+
+    if (action === "approve") {
+      // 1. Mark application as approved
+      application.status = "approved";
+      application.reviewedBy = req.user.id;
+      await application.save();
+
+      // 2. Upgrade the actual User's role and transfer their bio!
+      await User.findByIdAndUpdate(application.userId, { 
+        role: "seller",
+        "sellerProfile.bio": application.bio 
+      });
+      
+      res.json({ success: true, message: "Seller approved successfully!" });
+      
+    } else if (action === "reject") {
+      // Mark application as rejected, keep the user as a buyer
+      application.status = "rejected";
+      application.reviewedBy = req.user.id;
+      await application.save();
+      
+      res.json({ success: true, message: "Seller application rejected." });
+    } else {
+      res.status(400).json({ success: false, message: "Invalid action." });
+    }
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
