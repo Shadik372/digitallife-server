@@ -1,5 +1,6 @@
 import express from "express";
 import User from "../models/User.js";
+import Lesson from "../models/Lesson.js"; // 👈 Required for the live counting!
 import { verifyToken } from "../middlewares/verifyToken.js";
 
 const router = express.Router();
@@ -9,64 +10,32 @@ const router = express.Router();
 // ==========================================
 router.get("/home/top-contributors", async (req, res) => {
   try {
-    const topUsers = await User.find({})
-      .sort({ totalLessonsCreated: -1 })
-      .limit(4)
-      .select("name photoURL role totalLessonsCreated isPremium");
+    // 1. Fetch all users from the database
+    const users = await User.find({}).lean();
+    
+    // 2. LIVE COUNT: Go through every user and count their exact number of lessons
+    // This retroactively fixes any missing numbers!
+    const usersWithCounts = await Promise.all(
+      users.map(async (user) => {
+        const count = await Lesson.countDocuments({ creatorId: user._id });
+        return { ...user, totalLessonsCreated: count };
+      })
+    );
+
+    // 3. Sort them by whoever has the most lessons, and slice the top 4
+    const topUsers = usersWithCounts
+      .sort((a, b) => b.totalLessonsCreated - a.totalLessonsCreated)
+      .slice(0, 4)
+      .map(user => ({
+        _id: user._id,
+        name: user.name,
+        photoURL: user.photoURL,
+        role: user.role,
+        isPremium: user.isPremium,
+        totalLessonsCreated: user.totalLessonsCreated
+      }));
+
     res.json({ success: true, users: topUsers });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// ==========================================
-// 🛡️ ADMIN MANAGEMENT ROUTES
-// ==========================================
-
-// Get ALL lessons for the Admin Dashboard (Public & Private)
-router.get("/admin/all", verifyToken, async (req, res) => {
-  try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ success: false, message: "Unauthorized. Admins only." });
-    }
-    const lessons = await Lesson.find()
-      .populate("creatorId", "name email")
-      .sort({ createdAt: -1 });
-    res.json({ success: true, lessons });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// Toggle "Featured" Status
-router.patch("/:id/feature", verifyToken, async (req, res) => {
-  try {
-    if (req.user.role !== "admin") return res.status(403).json({ success: false, message: "Admins only." });
-    
-    const lesson = await Lesson.findById(req.params.id);
-    if (!lesson) return res.status(404).json({ success: false, message: "Lesson not found." });
-
-    lesson.isFeatured = !lesson.isFeatured;
-    await lesson.save();
-    
-    res.json({ success: true, isFeatured: lesson.isFeatured });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// Toggle "Reviewed" Status
-router.patch("/:id/review", verifyToken, async (req, res) => {
-  try {
-    if (req.user.role !== "admin") return res.status(403).json({ success: false, message: "Admins only." });
-    
-    const lesson = await Lesson.findById(req.params.id);
-    if (!lesson) return res.status(404).json({ success: false, message: "Lesson not found." });
-
-    lesson.isReviewed = !lesson.isReviewed;
-    await lesson.save();
-    
-    res.json({ success: true, isReviewed: lesson.isReviewed });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

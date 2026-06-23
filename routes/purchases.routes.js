@@ -17,14 +17,31 @@ router.get("/my-purchases", verifyToken, async (req, res) => {
   }
 });
 
-// Seller/Admin: Get sales history
+// Seller/Admin: Get sales history AND DYNAMIC STATS
 router.get("/my-sales", verifyToken, verifyRole(["seller", "admin"]), async (req, res) => {
   try {
     const sales = await Purchase.find({ sellerId: req.user.id })
       .populate("lessonId", "title price image")
       .populate("buyerId", "name email")
       .sort({ purchasedAt: -1 });
-    res.json({ success: true, sales });
+
+    // =====================================
+    // 🚀 BULLETPROOF DYNAMIC CALCULATION
+    // =====================================
+    // Calculate the exact numbers live based on actual purchase records
+    const totalSales = sales.length;
+    
+    // Sum up the total earnings (defaults to 0 if amount is missing)
+    const totalEarnings = sales.reduce((sum, sale) => sum + (sale.amount || 0), 0);
+
+    res.json({ 
+      success: true, 
+      sales, 
+      stats: {
+        totalSales,
+        totalEarnings
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

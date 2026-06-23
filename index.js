@@ -27,9 +27,11 @@ app.use(cors({
   credentials: true
 }));
 
+// Global JSON Parser must be above your route definitions
+app.use(express.json());
+
 app.all("/api/auth/*", toNodeHandler(auth));
 
-// Basic Health Check Route
 app.get("/", (req, res) => {
   res.send("Digital Life Lessons API is running...");
 });
@@ -37,13 +39,7 @@ app.get("/", (req, res) => {
 const startServer = async () => {
   await connectDB();
   
-  // 1. Mount Payment Routes FIRST (Webhook needs raw body)
-  app.use("/api/payment", paymentRoutes);
-
-  // 2. Global JSON Parser for all subsequent routes
-  app.use(express.json());
-
-  // 3. Mount standard CRUD routes
+  // Mount routes
   app.use("/api/admin", adminRoutes);
   app.use("/api/users", userRoutes);
   app.use("/api/lessons", lessonRoutes);
@@ -51,6 +47,7 @@ const startServer = async () => {
   app.use("/api/comments", commentRoutes);
   app.use("/api/sellers", sellerRoutes);
   app.use("/api/purchases", purchaseRoutes);
+  app.use("/api/payments", paymentRoutes);
 
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
