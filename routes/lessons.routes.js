@@ -4,12 +4,34 @@ import { verifyToken } from "../middlewares/verifyToken.js";
 
 const router = express.Router();
 
-// Get all public lessons (Accessible to everyone)
+// ==========================================
+// 🔍 GET ALL PUBLIC LESSONS (With Search & Filters!)
+// ==========================================
 router.get("/", async (req, res) => {
   try {
-    const lessons = await Lesson.find({ visibility: "Public" })
+    const { search, category, tone } = req.query;
+    
+    // Start with a base query: Only show Public lessons
+    let query = { visibility: "Public" };
+
+    // If the user typed in the search bar, filter by title (case-insensitive)
+    if (search) {
+      query.title = { $regex: search, $options: "i" };
+    }
+    
+    // If they picked a specific category
+    if (category && category !== "All") {
+      query.category = category;
+    }
+    
+    // If they picked a specific emotional tone
+    if (tone && tone !== "All") {
+      query.emotionalTone = tone;
+    }
+
+    const lessons = await Lesson.find(query)
       .populate("creatorId", "name photoURL role isPremium")
-      .sort({ createdAt: -1 }); // Newest first
+      .sort({ createdAt: -1 });
 
     res.json({ success: true, lessons });
   } catch (error) {
@@ -17,37 +39,27 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Create a new lesson (Requires login)
+// ==========================================
+// ✍️ CREATE A NEW LESSON
+// ==========================================
 router.post("/", verifyToken, async (req, res) => {
   try {
-    // --- DIAGNOSTIC LOGS ---
-    console.log("User trying to create lesson:", req.user);
-    console.log("Lesson Data received:", req.body);
-    // -----------------------
+    // Only Sellers and Admins can lock lessons behind the Premium paywall
+    const canCreatePremium = req.user.role === "seller" || req.user.role === "admin";
+    const accessLevel = canCreatePremium ? req.body.accessLevel : "Free";
 
-    // Failsafe: if a Free user tries to submit 'Premium', override it to 'Free'
-    const accessLevel = req.user.isPremium ? req.body.accessLevel : "Free";
-
-    // Bulletproof ID extraction (handles id, _id, or userId)
     const creatorId = req.user.id || req.user._id || req.user.userId;
+    if (!creatorId) return res.status(400).json({ success: false, message: "Could not identify User ID." });
 
-    if (!creatorId) {
-      return res.status(400).json({ success: false, message: "Server could not identify your User ID." });
-    }
-
-    const newLesson = new Lesson({
-      ...req.body,
-      creatorId: creatorId,
-      accessLevel
-    });
-
+    const newLesson = new Lesson({ ...req.body, creatorId, accessLevel });
     const savedLesson = await newLesson.save();
+    
     res.status(201).json({ success: true, lesson: savedLesson });
   } catch (error) {
-    console.error("Lesson Creation Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
 // Get a single lesson by ID
 router.get("/:id", async (req, res) => {
   try {
