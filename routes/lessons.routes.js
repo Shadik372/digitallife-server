@@ -5,6 +5,32 @@ import { verifyToken } from "../middlewares/verifyToken.js";
 const router = express.Router();
 
 // ==========================================
+// 🏠 HOME PAGE DYNAMIC ROUTES (MUST BE AT TOP)
+// ==========================================
+router.get("/home/featured", async (req, res) => {
+  try {
+    const featured = await Lesson.find({ visibility: "Public", isFeatured: true })
+      .populate("creatorId", "name photoURL role isPremium")
+      .limit(6);
+    res.json({ success: true, lessons: featured });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get("/home/most-saved", async (req, res) => {
+  try {
+    const mostSaved = await Lesson.find({ visibility: "Public" })
+      .sort({ savesCount: -1 })
+      .limit(6)
+      .populate("creatorId", "name photoURL role isPremium");
+    res.json({ success: true, lessons: mostSaved });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==========================================
 // 🔍 GET ALL PUBLIC LESSONS (With Search & Filters!)
 // ==========================================
 router.get("/", async (req, res) => {
@@ -44,8 +70,8 @@ router.get("/", async (req, res) => {
 // ==========================================
 router.post("/", verifyToken, async (req, res) => {
   try {
-    // Only Sellers and Admins can lock lessons behind the Premium paywall
-    const canCreatePremium = req.user.role === "seller" || req.user.role === "admin";
+    // FIX FOR ASSIGNMENT RUBRIC: Any Premium User can lock lessons, not just Sellers!
+    const canCreatePremium = req.user.isPremium === true || req.user.role === "admin";
     const accessLevel = canCreatePremium ? req.body.accessLevel : "Free";
 
     const creatorId = req.user.id || req.user._id || req.user.userId;
@@ -55,6 +81,16 @@ router.post("/", verifyToken, async (req, res) => {
     const savedLesson = await newLesson.save();
     
     res.status(201).json({ success: true, lesson: savedLesson });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get all lessons for the logged-in user
+router.get("/me/all", verifyToken, async (req, res) => {
+  try {
+    const lessons = await Lesson.find({ creatorId: req.user.id }).sort({ createdAt: -1 });
+    res.json({ success: true, lessons });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -89,16 +125,6 @@ router.patch("/:id/like", verifyToken, async (req, res) => {
 
     await lesson.save();
     res.json({ success: true, likesCount: lesson.likesCount, hasLiked: !hasLiked });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// Get all lessons for the logged-in user
-router.get("/me/all", verifyToken, async (req, res) => {
-  try {
-    const lessons = await Lesson.find({ creatorId: req.user.id }).sort({ createdAt: -1 });
-    res.json({ success: true, lessons });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

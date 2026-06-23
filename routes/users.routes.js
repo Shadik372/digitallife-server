@@ -4,6 +4,24 @@ import { verifyToken } from "../middlewares/verifyToken.js";
 
 const router = express.Router();
 
+// ==========================================
+// 🏠 HOME PAGE DYNAMIC ROUTES
+// ==========================================
+router.get("/home/top-contributors", async (req, res) => {
+  try {
+    const topUsers = await User.find({})
+      .sort({ totalLessonsCreated: -1 })
+      .limit(4)
+      .select("name photoURL role totalLessonsCreated isPremium");
+    res.json({ success: true, users: topUsers });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==========================================
+// STANDARD USER ROUTES
+// ==========================================
 router.get("/make-me-admin", async (req, res) => {
   try {
     const updatedUser = await User.findOneAndUpdate(
