@@ -20,23 +20,76 @@ router.get("/home/top-contributors", async (req, res) => {
 });
 
 // ==========================================
+// 🛡️ ADMIN MANAGEMENT ROUTES
+// ==========================================
+
+// Get ALL lessons for the Admin Dashboard (Public & Private)
+router.get("/admin/all", verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Unauthorized. Admins only." });
+    }
+    const lessons = await Lesson.find()
+      .populate("creatorId", "name email")
+      .sort({ createdAt: -1 });
+    res.json({ success: true, lessons });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Toggle "Featured" Status
+router.patch("/:id/feature", verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") return res.status(403).json({ success: false, message: "Admins only." });
+    
+    const lesson = await Lesson.findById(req.params.id);
+    if (!lesson) return res.status(404).json({ success: false, message: "Lesson not found." });
+
+    lesson.isFeatured = !lesson.isFeatured;
+    await lesson.save();
+    
+    res.json({ success: true, isFeatured: lesson.isFeatured });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Toggle "Reviewed" Status
+router.patch("/:id/review", verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") return res.status(403).json({ success: false, message: "Admins only." });
+    
+    const lesson = await Lesson.findById(req.params.id);
+    if (!lesson) return res.status(404).json({ success: false, message: "Lesson not found." });
+
+    lesson.isReviewed = !lesson.isReviewed;
+    await lesson.save();
+    
+    res.json({ success: true, isReviewed: lesson.isReviewed });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==========================================
 // STANDARD USER ROUTES
 // ==========================================
-router.get("/make-me-admin", async (req, res) => {
+router.patch("/make-me-admin", verifyToken, async (req, res) => {
   try {
-    const updatedUser = await User.findOneAndUpdate(
-      { email: "test123@gmail.com" }, // Your exact email
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id,
       { role: "admin" },
       { new: true }
     );
 
     if (updatedUser) {
-      res.send(`Success! ${updatedUser.email} is now an Admin. Go log out and log back in!`);
+      res.json({ success: true, message: "Success! You are now an Admin. Please log out and log back in to apply the changes." });
     } else {
-      res.send("User not found!");
+      res.status(404).json({ success: false, message: "User not found!" });
     }
   } catch (error) {
-    res.status(500).send(error.message);
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
