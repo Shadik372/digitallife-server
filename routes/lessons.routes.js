@@ -1,6 +1,6 @@
 import express from "express";
 import Lesson from "../models/Lesson.js";
-import LessonReport from "../models/LessonReport.js"; // 👈 New Import for Reports
+import LessonReport from "../models/LessonReport.js";
 import { verifyToken } from "../middlewares/verifyToken.js";
 
 const router = express.Router();
@@ -10,15 +10,25 @@ const router = express.Router();
 // ==========================================
 router.get("/home/featured", async (req, res) => {
   try {
-    const featured = await Lesson.find({ visibility: "Public", isFeatured: true })
+    // 1. Try to find explicitly featured public lessons
+    let featured = await Lesson.find({ visibility: "Public", isFeatured: true })
       .populate("creatorId", "name photoURL role isPremium")
-      .limit(6);
+      .limit(3); // 👈 Changed from 6 to 3
+
+    // 2. SMART FALLBACK: If no lessons are explicitly featured yet,
+    // automatically fetch the top 3 most liked public lessons instead.
+    if (featured.length === 0) {
+      featured = await Lesson.find({ visibility: "Public" })
+        .populate("creatorId", "name photoURL role isPremium")
+        .sort({ likesCount: -1 }) 
+        .limit(3); // 👈 Changed from 6 to 3
+    }
+
     res.json({ success: true, lessons: featured });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
-
 router.get("/home/most-saved", async (req, res) => {
   try {
     const mostSaved = await Lesson.find({ visibility: "Public" })

@@ -1,6 +1,6 @@
 import express from "express";
 import User from "../models/User.js";
-import Lesson from "../models/Lesson.js"; // 👈 Required for the live counting!
+import Lesson from "../models/Lesson.js"; 
 import { verifyToken } from "../middlewares/verifyToken.js";
 
 const router = express.Router();
@@ -10,30 +10,49 @@ const router = express.Router();
 // ==========================================
 router.get("/home/top-contributors", async (req, res) => {
   try {
-    // 1. Fetch all users from the database
-    const users = await User.find({}).lean();
-    
-    // 2. LIVE COUNT: Go through every user and count their exact number of lessons
-    // This retroactively fixes any missing numbers!
-    const usersWithCounts = await Promise.all(
-      users.map(async (user) => {
-        const count = await Lesson.countDocuments({ creatorId: user._id });
-        return { ...user, totalLessonsCreated: count };
-      })
-    );
-
-    // 3. Sort them by whoever has the most lessons, and slice the top 4
-    const topUsers = usersWithCounts
-      .sort((a, b) => b.totalLessonsCreated - a.totalLessonsCreated)
-      .slice(0, 4)
-      .map(user => ({
-        _id: user._id,
-        name: user.name,
-        photoURL: user.photoURL,
-        role: user.role,
-        isPremium: user.isPremium,
-        totalLessonsCreated: user.totalLessonsCreated
-      }));
+    // 🚀 THE MONGODB AGGREGATION PIPELINE
+    // This calculates everything inside the database in 1 single query
+    const topUsers = await Lesson.aggregate([
+      // 1. Group all lessons by their creatorId and count them
+      { 
+        $group: { 
+          _id: "$creatorId", 
+          totalLessonsCreated: { $sum: 1 } 
+        } 
+      },
+      // 2. Sort the groups from highest count to lowest
+      { 
+        $sort: { totalLessonsCreated: -1 } 
+      },
+      // 3. Keep only the top 4 creators to save memory
+      { 
+        $limit: 4 
+      },
+      // 4. "JOIN" with the Users collection to grab their profile details
+      { 
+        $lookup: {
+          from: "users", // MongoDB automatically lowercases and pluralizes your "User" model name
+          localField: "_id",
+          foreignField: "_id",
+          as: "userInfo"
+        }
+      },
+      // 5. Flatten the joined array
+      { 
+        $unwind: "$userInfo" 
+      },
+      // 6. Format the final output to exactly what the frontend expects
+      { 
+        $project: {
+          _id: 1,
+          totalLessonsCreated: 1,
+          name: "$userInfo.name",
+          photoURL: "$userInfo.photoURL",
+          role: "$userInfo.role",
+          isPremium: "$userInfo.isPremium"
+        }
+      }
+    ]);
 
     res.json({ success: true, users: topUsers });
   } catch (error) {
