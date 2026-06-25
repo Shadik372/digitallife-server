@@ -176,11 +176,26 @@ router.patch("/:id", verifyToken, async (req, res) => {
 router.delete("/:id", verifyToken, async (req, res) => {
   try {
     const lesson = await Lesson.findById(req.params.id);
-    if (!lesson) return res.status(404).json({ success: false, message: "Lesson not found." });
-    if (lesson.creatorId.toString() !== req.user.id && req.user.role !== "admin") {
-      return res.status(403).json({ success: false, message: "Unauthorized." });
+    if (!lesson) {
+      return res.status(404).json({ success: false, message: "Lesson not found." });
     }
+
+    // 🛡️ Admin Override Logic
+    const isOwner = lesson.creatorId.toString() === req.user.id;
+    const isAdmin = req.user.role === "admin";
+
+    // If they are neither the owner nor an admin, block them!
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ success: false, message: "Unauthorized. You cannot delete this lesson." });
+    }
+
+    // If authorized, proceed with deletion
     await Lesson.findByIdAndDelete(req.params.id);
+
+    // Optional but highly recommended: Also delete all reports associated with this lesson
+    // so they don't clutter your database as "orphan" records.
+    await LessonReport.deleteMany({ lessonId: req.params.id });
+
     res.json({ success: true, message: "Lesson deleted successfully." });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
