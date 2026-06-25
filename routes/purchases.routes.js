@@ -47,4 +47,22 @@ router.get("/my-sales", verifyToken, verifyRole(["seller", "admin"]), async (req
   }
 });
 
+// =====================================
+// 🔓 CHECK IF USER BOUGHT SPECIFIC LESSON
+// =====================================
+router.get("/check/:lessonId", verifyToken, async (req, res) => {
+  try {
+    // Look for a single receipt matching this buyer and this lesson
+    const purchase = await Purchase.findOne({ 
+      buyerId: req.user.id, 
+      lessonId: req.params.lessonId 
+    });
+    
+    // If a purchase record exists, return true!
+    res.json({ success: true, hasPurchased: !!purchase });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 export default router;

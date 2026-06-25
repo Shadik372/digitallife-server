@@ -13,10 +13,11 @@ const lessonSchema = new mongoose.Schema({
   likesCount: { type: Number, default: 0 },
   savesCount: { type: Number, default: 0 },
   isForSale: { type: Boolean, default: false },
-  price: {
-    type: Number,
+ price: { 
+    type: Number, 
     default: 0,
-    max: [50, "Price cannot exceed $50 BDT"]
+    min: [100, "Price must be at least 100 BDT to meet Stripe minimums"],
+    max: [5000, "Price cannot exceed 5000 BDT"] 
   },
   purchaseCount: { type: Number, default: 0 },
   isFeatured: { type: Boolean, default: false },

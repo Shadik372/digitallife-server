@@ -44,16 +44,20 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
 // 2. CREATE PREMIUM CHECKOUT SESSION
 router.post("/create-checkout-session", verifyToken, async (req, res) => {
   try {
+    // Safely extract User ID
+    const userId = req.user?.id || req.user?._id || req.user?.userId;
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [{ price_data: { currency: "bdt", product_data: { name: "Premium Lifetime" }, unit_amount: 1500 * 100 }, quantity: 1 }],
       mode: "payment",
       success_url: `${process.env.CLIENT_URL}/payment/success`,
       cancel_url: `${process.env.CLIENT_URL}/payment/cancel`,
-      metadata: { type: "premium_subscription", userId: req.user.id },
+      metadata: { type: "premium_subscription", userId: userId.toString() },
     });
     res.json({ success: true, url: session.url });
   } catch (error) {
+    console.error("Premium Checkout Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -61,20 +65,49 @@ router.post("/create-checkout-session", verifyToken, async (req, res) => {
 // 3. CREATE LESSON CHECKOUT SESSION
 router.post("/create-lesson-checkout-session", verifyToken, async (req, res) => {
   try {
+    // 🛡️ Safety Check 1: Ensure body parsed correctly
+    if (!req.body || !req.body.lessonId) {
+      return res.status(400).json({ success: false, message: "Missing lesson ID in request." });
+    }
+
     const { lessonId } = req.body;
     const lesson = await Lesson.findById(lessonId);
-    if (!lesson || !lesson.isForSale) return res.status(404).json({ success: false, message: "Not available for sale." });
+    
+    if (!lesson || !lesson.isForSale) {
+      return res.status(404).json({ success: false, message: "Not available for sale." });
+    }
+
+    // 🛡️ Safety Check 2: Safely extract the User ID
+    const buyerId = req.user?.id || req.user?._id || req.user?.userId;
+    if (!buyerId) {
+      return res.status(401).json({ success: false, message: "Unauthorized user session." });
+    }
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
-      line_items: [{ price_data: { currency: "bdt", product_data: { name: `Lesson: ${lesson.title}` }, unit_amount: lesson.price * 100 }, quantity: 1 }],
+      line_items: [{ 
+        price_data: { 
+          currency: "bdt", 
+          product_data: { name: `Lesson: ${lesson.title}` }, 
+          // 🛡️ Safety Check 3: Math.round prevents fatal float errors
+          unit_amount: Math.round(lesson.price * 100) 
+        }, 
+        quantity: 1 
+      }],
       mode: "payment",
       success_url: `${process.env.CLIENT_URL}/payment/success`,
       cancel_url: `${process.env.CLIENT_URL}/payment/cancel`,
-      metadata: { type: "lesson_purchase", lessonId: lesson._id.toString(), buyerId: req.user.id, sellerId: lesson.creatorId.toString() },
+      metadata: { 
+        type: "lesson_purchase", 
+        lessonId: lesson._id.toString(), 
+        buyerId: buyerId.toString(), 
+        sellerId: lesson.creatorId.toString() 
+      },
     });
+    
     res.json({ success: true, url: session.url });
   } catch (error) {
+    console.error("🔥 Stripe Checkout Error:", error.message); // This will print the exact reason to your terminal
     res.status(500).json({ success: false, message: error.message });
   }
 });

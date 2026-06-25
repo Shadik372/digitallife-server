@@ -27,8 +27,18 @@ app.use(cors({
   credentials: true
 }));
 
-// Global JSON Parser must be above your route definitions
-app.use(express.json());
+// ==========================================
+// 🚀 SMART JSON PARSER (STRIPE BYPASS)
+// ==========================================
+// This parses JSON for all routes EXCEPT the Stripe Webhook.
+// This allows the Webhook to receive the raw buffer it needs!
+app.use((req, res, next) => {
+  if (req.originalUrl === "/api/payments/webhook") {
+    next(); 
+  } else {
+    express.json()(req, res, next); 
+  }
+});
 
 app.all("/api/auth/*", toNodeHandler(auth));
 
