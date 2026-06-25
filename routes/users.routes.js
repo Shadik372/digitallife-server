@@ -5,52 +5,40 @@ import { verifyToken } from "../middlewares/verifyToken.js";
 
 const router = express.Router();
 
-// ==========================================
-// 🏠 HOME PAGE DYNAMIC ROUTES
-// ==========================================
+
 router.get("/home/top-contributors", async (req, res) => {
   try {
-    // 🚀 THE MONGODB AGGREGATION PIPELINE
-    // This calculates everything inside the database in 1 single query
-    const topUsers = await Lesson.aggregate([
-      // 1. Group all lessons by their creatorId and count them
-      { 
-        $group: { 
-          _id: "$creatorId", 
-          totalLessonsCreated: { $sum: 1 } 
-        } 
-      },
-      // 2. Sort the groups from highest count to lowest
-      { 
-        $sort: { totalLessonsCreated: -1 } 
-      },
-      // 3. Keep only the top 4 creators to save memory
-      { 
-        $limit: 4 
-      },
-      // 4. "JOIN" with the Users collection to grab their profile details
-      { 
+    const topUsers = await User.aggregate([
+      {
         $lookup: {
-          from: "users", // MongoDB automatically lowercases and pluralizes your "User" model name
+          from: "lessons", // MongoDB automatically lowercases and pluralizes "Lesson" to "lessons"
           localField: "_id",
-          foreignField: "_id",
-          as: "userInfo"
+          foreignField: "creatorId",
+          as: "createdLessons" // Puts all their lessons into an array called createdLessons
         }
       },
-      // 5. Flatten the joined array
-      { 
-        $unwind: "$userInfo" 
-      },
-      // 6. Format the final output to exactly what the frontend expects
-      { 
+      // 2. Format the data and COUNT the size of that array instantly
+      {
         $project: {
           _id: 1,
-          totalLessonsCreated: 1,
-          name: "$userInfo.name",
-          photoURL: "$userInfo.photoURL",
-          role: "$userInfo.role",
-          isPremium: "$userInfo.isPremium"
+          name: 1,
+          photoURL: 1,
+          role: 1,
+          isPremium: 1,
+          totalLessonsCreated: { $size: "$createdLessons" } // Counts the array!
         }
+      },
+      // 3. 🛡️ Filter out any users who have 0 lessons (so we only show active contributors)
+      {
+        $match: { totalLessonsCreated: { $gt: 0 } }
+      },
+      // 4. Sort from highest amount of lessons to lowest
+      {
+        $sort: { totalLessonsCreated: -1 }
+      },
+      // 5. Limit to the top 4 to fit perfectly in your frontend grid
+      {
+        $limit: 4
       }
     ]);
 
