@@ -13,11 +13,19 @@ const lessonSchema = new mongoose.Schema({
   likesCount: { type: Number, default: 0 },
   savesCount: { type: Number, default: 0 },
   isForSale: { type: Boolean, default: false },
- price: { 
+price: { 
     type: Number, 
     default: 0,
-    min: [100, "Price must be at least 100 BDT to meet Stripe minimums"],
-    max: [5000, "Price cannot exceed 5000 BDT"] 
+    validate: {
+      validator: function(value) {
+        // 1. If the lesson is NOT for sale (Free), any price (like 0) is completely fine!
+        if (!this.isForSale) return true;
+        
+        // 2. If it IS for sale, enforce the Stripe minimum and your maximum
+        return value >= 100 && value <= 5000;
+      },
+      message: "If a lesson is for sale, the price must be between 100 BDT and 5000 BDT to meet Stripe limits."
+    }
   },
   purchaseCount: { type: Number, default: 0 },
   isFeatured: { type: Boolean, default: false },
