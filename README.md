@@ -6,10 +6,10 @@
 This is the backend REST API for the Digital Life Lessons platform. It handles secure authentication, robust data validation, Stripe payment processing via webhooks, and complex MongoDB aggregation pipelines to serve dynamic statistics to the frontend.
 
 ## ✨ Key Features
-* **Secure Routing:** JWT token verification middleware to protect private routes and ensure only owners or admins can modify/delete content[cite: 281, 282, 283].
-* **Stripe Webhooks:** Fully integrated Stripe checkout sessions and automated webhook listeners to upgrade users to Premium upon successful payment[cite: 106, 107].
-* **Advanced Aggregations:** Utilizes highly optimized MongoDB aggregation pipelines to calculate "Top Contributors" and platform revenue without overloading server memory[cite: 87, 215].
-* **Content Moderation API:** Dedicated endpoints for users to report lessons and for admins to review, dismiss, or permanently delete flagged content[cite: 152, 237, 242].
+* **Secure Routing:** JWT token verification middleware to protect private routes and ensure only owners or admins can modify/delete content
+* **Stripe Webhooks:** Fully integrated Stripe checkout sessions and automated webhook listeners to upgrade users to Premium upon successful payment
+* **Advanced Aggregations:** Utilizes highly optimized MongoDB aggregation pipelines to calculate "Top Contributors" and platform revenue without overloading server memory
+* **Content Moderation API:** Dedicated endpoints for users to report lessons and for admins to review, dismiss, or permanently delete flagged content
 * **Smart Validation:** Custom Mongoose schema validation to enforce logical constraints (e.g., minimum Stripe pricing limits only apply to Premium lessons).
 
 ## 📦 NPM Packages Used
@@ -21,7 +21,7 @@ This is the backend REST API for the Digital Life Lessons platform. It handles s
 * `better-auth` (Server-side authentication management)
 
 ## 🔐 Environment Variables
-[cite_start]To run this server locally, create a `.env` file with the following keys[cite: 36]:
+To run this server locally, create a `.env` file with the following keys: 
 * `PORT` 
 * `MONGODB_URI` 
 * `BETTER_AUTH_SECRET` 
